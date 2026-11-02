@@ -1,0 +1,190 @@
+name: kotlin
+type: service
+icon: kotlin
+title: Kotlin
+scalable: true
+guidance: GUIDANCE.md
+labels:
+- kotlin
+- jvm
+- java
+- gradle
+# Versions are Java (JDK) feature versions. Kotlin's own version comes from the
+# project's Gradle build.
+options:
+- version: '25'
+  default: true
+  tag: 25-r0
+  devTag: 25-dev-r0
+- version: '21'
+  tag: 21-r0
+  devTag: 21-dev-r0
+endpoints:
+- name: kotlin
+  ports:
+  - name: http
+    number: 8080
+    main: true
+    protocol: http
+
+links:
+- name: db
+  title: DBMS
+  required: false
+  env:
+  - name: DB_HOST
+    value: '{{link.database.host}}'
+  - name: DB_PORT
+    value: '{{link.database.port}}'
+  - name: DB_USERNAME
+    value: '{{link.database.user.name}}'
+  - name: DB_NAME
+    value: '{{link.database.db.name}}'
+  - name: DB_DATABASE
+    value: '{{link.database.db.name}}'
+  - name: DB_PASSWORD
+    value: '{{link.database.user.password}}'
+    secret: true
+  - name: DB_DRIVER
+    value: '{{link.database.driver}}'
+  - name: DB_CONNECTION
+    value: '{{link.database.driver}}'
+  selectors:
+  - type: db
+    labels:
+    - mariadb
+  - type: db
+    labels:
+    - mysql
+  - type: db
+    labels:
+    - postgres
+- name: sendmail
+  title: Mail Transfer Agent
+  required: false
+  env:
+  - name: SMTP_HOST
+    value: '{{link.host}}'
+  - name: SMTP_PORT
+    value: '{{link.port}}'
+  selectors:
+  - type: service
+    labels:
+    - smtpd
+- name: redis
+  title: Redis
+  required: false
+  env:
+  - name: REDIS_PORT
+    value: '{{link.port}}'
+  - name: REDIS_HOST
+    value: '{{link.host}}'
+  - name: REDIS_PASSWORD
+    value: '{{link.tokens.password}}'
+    secret: true
+  selectors:
+  - type: datastore
+    labels:
+    - redis
+  - type: datastore
+    labels:
+    - valkey
+
+integrations:
+- name: variable
+  title: Variable
+  type: variable
+  required: false
+  multiple: true
+
+build:
+  dockerfile: Dockerfile
+  connect: true
+  boilerplates:
+  - name: kotlin
+    title: Kotlin boilerplate
+    repo: https://github.com/wodby/kotlin-boilerplate
+    branch: main
+
+deployment:
+  strategy: rolling
+  maxUnavailable: 0
+  maxSurge: 1
+  minReady: 10s
+  progressDeadline: 15m
+  shutdownGracePeriod: 30s
+
+helm:
+  name: wodby
+  source: oci://registry-1.docker.io/wodby/stateless
+  chart: oci://registry-1.docker.io/wodby/stateless
+  version: 0.4.0
+  valueMappings:
+    replicas: replicaCount
+    nameOverride: nameOverride
+    fullnameOverride: fullnameOverride
+    serviceAccountName: serviceAccount.name
+    serviceAccountCreate: serviceAccount.create
+  values:
+  - name: containerName
+    value: kotlin
+  - name: containerPorts
+    value:
+    - name: http
+      containerPort: 8080
+      protocol: TCP
+  # The JVM and a first build in a development workspace can take a while to
+  # start, so readiness only waits for the port and nothing restarts the
+  # container for being slow.
+  - name: readinessProbe
+    value:
+      tcpSocket:
+        port: http
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 2
+
+workloads:
+- name: main
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: '{{helm.release}}'
+  kind: deployment
+  primary: true
+  helm:
+    labels: podLabels
+    annotations: podAnnotations
+    volumes: extraVolumes
+  containers:
+  - name: kotlin
+    image: wodby/jdk
+    build: true
+    helm:
+      resources: resources
+      env: envVars
+      mounts: extraVolumeMounts
+
+workspace:
+  configuration: [/docker-entrypoint.sh, --configure-runtime]
+  runner:
+    workload: main
+    container: kotlin
+    workingDirectory: /usr/src/app
+    homeDirectory: /home/wodby
+    username: wodby
+    uid: 1000
+    gid: 1000
+    port: 2222
+    command: [sudo, /usr/sbin/sshd, -D, -e, -f, /dev/null]
+  mounts:
+  - name: code
+    workload: main
+    container: kotlin
+    path: /usr/src/app
+  preparation:
+  - name: dependencies
+    command: [workspace-gradle, prepare]
+    timeoutSeconds: 1800
+  # workspace-gradle builds the checkout again and restarts the application when a file changes.
+  reload: watch
