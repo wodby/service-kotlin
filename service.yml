@@ -2,7 +2,7 @@ name: kotlin
 type: service
 from: java
 fromVersionConstraint: "^1.0.0"
-fromVersion: "1.0.0"
+fromVersion: "1.1.1"
 guidance: GUIDANCE.md
 icon: kotlin
 title: Kotlin
