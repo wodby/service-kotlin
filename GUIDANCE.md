@@ -10,7 +10,7 @@ The service runs one self-contained jar with `java -jar`, so `./gradlew assemble
 
 - With the Shadow plugin (`com.gradleup.shadow`), set the shadow jar's classifier to empty and the plain jar's to `plain`. Jars ending in `-plain` are not counted. Call `mergeServiceFiles()` so libraries found through `META-INF/services`, such as Ktor's and Netty's, keep working.
 - With Ktor's Gradle plugin, `buildFatJar` makes such a jar; add it to `assemble` and mark the plain jar the same way.
-- A build with several jars needs `JAVA_BUILD_JAR` on the service, relative to the repository, such as `server/build/libs/server-all.jar`.
+- A build with several jars needs `JAVA_BUILD_JAR`, relative to the repository, such as `server/build/libs/server-all.jar`. Add it to the service as a build variable; a development workspace builds at runtime, so give it the runtime scope too.
 
 The application plugin's `installDist` layout (a start script and a `lib/` folder) is not used. Skipping its `distZip` and `distTar` tasks keeps builds and workspace rebuilds shorter.
 
